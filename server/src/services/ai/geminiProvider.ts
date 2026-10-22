@@ -25,7 +25,7 @@ techCorpus.forEach(doc => {
   tfidfDocCount++;
 });
 
-class GeminiProvider implements AIProvider {
+export class GeminiProvider implements AIProvider {
   private genAI: GoogleGenerativeAI | null = null;
   private model: any = null;
   private embeddingModel: any = null;
@@ -51,7 +51,7 @@ class GeminiProvider implements AIProvider {
           },
         });
         this.embeddingModel = this.genAI.getGenerativeModel({
-          model: 'text-embedding-004',
+          model: 'gemini-embedding-001',
         });
         this.available = true;
         console.log('✅ Gemini AI provider initialized');
@@ -305,7 +305,5 @@ Return ONLY the bullet point text, no quotes, no extra formatting.
   }
 }
 
-// Factory function to get the appropriate provider
-export function getAIProvider(): AIProvider {
-  return new GeminiProvider();
-}
+// Factory function removed - use the singleton from ./index.ts instead
+// import { aiProvider } from './index.js';

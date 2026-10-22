@@ -62,7 +62,6 @@ const jobListingSchema = new Schema<IJobListing>({
 
 // Indexes
 jobListingSchema.index({ type: 1, isActive: 1 });
-jobListingSchema.index({ requiredSkills: 1 });
 jobListingSchema.index({ title: 'text', description: 'text', organization: 'text' });
 
 export const JobListingModel = mongoose.model<IJobListing>('JobListing', jobListingSchema);

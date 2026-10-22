@@ -2,7 +2,7 @@ import { UserModel } from '../models/User.js';
 import { CourseModel } from '../models/Course.js';
 import { InteractionModel } from '../models/Interaction.js';
 import TfIdf from 'natural/lib/natural/tfidf/tfidf.js';
-import { getAIProvider } from './ai/geminiProvider.js';
+import { aiProvider } from './ai/index.js';
 import type { Types } from 'mongoose';
 
 // ============================================
@@ -49,7 +49,7 @@ function buildTfIdfVector(documents: string[], queryTerms: string[]): number[] {
   documents.forEach(doc => tfidf.addDocument(doc));
 
   const vector = new Array(queryTerms.length).fill(0);
-  tfidf.listTerms(0).forEach((term, idx) => {
+  tfidf.listTerms(0).forEach((term: { term: string; tfidf: number }, idx: number) => {
     const termIndex = queryTerms.indexOf(term.term);
     if (termIndex >= 0) {
       vector[termIndex] = term.tfidf;
@@ -69,7 +69,6 @@ async function generateEmbedding(text: string): Promise<number[]> {
     return embeddingCache.get(cacheKey)!;
   }
 
-  const aiProvider = getAIProvider();
   const embedding = await aiProvider.generateTextEmbeddings(text);
 
   embeddingCache.set(cacheKey, embedding);

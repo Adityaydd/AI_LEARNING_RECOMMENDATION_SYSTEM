@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { UserModel } from '../models/User.js';
 import { CourseModel } from '../models/Course.js';
 import { DailyTaskModel } from '../models/DailyTask.js';
-import { getAIProvider } from '../services/ai/geminiProvider.js';
+import { aiProvider } from '../services/ai/index.js';
 
 const generateTasksParamsSchema = z.object({
   userId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid user ID format'),
@@ -85,7 +85,6 @@ export async function generateDailyTasks(req: Request, res: Response) {
     }
 
     // Generate tasks using AI provider
-    const aiProvider = getAIProvider();
     const tasks = await aiProvider.generateDailyTasks(
       {
         interests: user.interests || [],

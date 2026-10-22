@@ -2,8 +2,16 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { connectDB } from '../db/connect.js';
-import { UserModel } from '../models/User.js';
-import { CourseModel } from '../models/Course.js';
+import { UserModel, type User } from '../models/User.js';
+import { CourseModel, type Course } from '../models/Course.js';
+
+// Demo user ObjectIds (matching Navbar.tsx DEMO_USERS)
+const DEMO_USER_IDS = {
+  'Peyton Garcia': new mongoose.Types.ObjectId('6ad99527d2621ee6c604e74e'),
+  'Peyton Lewis': new mongoose.Types.ObjectId('6ad99527d2621ee6c604e750'),
+  'Alex Chen': new mongoose.Types.ObjectId('6ad99527d2621ee6c604e74f'),
+  'Jordan Kim': new mongoose.Types.ObjectId('6ad99527d2621ee6c604e751'),
+};
 
 // ============================================
 // CONFIGURATION
@@ -418,7 +426,7 @@ async function seed() {
 
     // Create courses
     console.log(`📚 Creating ${NUM_COURSES} courses...`);
-    const courses = [];
+    const courses: Course[] = [];
     for (let i = 0; i < NUM_COURSES; i++) {
       const courseData = generateCourse(i);
       const course = new CourseModel(courseData);
@@ -431,18 +439,99 @@ async function seed() {
     console.log(`✅ Created ${courses.length} courses`);
 
     // Create users
-    console.log(`👥 Creating ${NUM_USERS} users...`);
-    const users = [];
-    for (let i = 0; i < NUM_USERS; i++) {
+    console.log(`👥 Creating ${NUM_USERS} users (including 4 demo users)...`);
+    const users: User[] = [];
+
+    // First, create the 4 demo users with specific ObjectIds
+    const demoUsersData = [
+      {
+        _id: DEMO_USER_IDS['Peyton Garcia'],
+        name: 'Peyton Garcia',
+        email: 'peyton.garcia@demo.com',
+        passwordHash: PASSWORD_HASH,
+        role: 'learner' as const,
+        onboardingCompleted: true,
+        academicBackground: 'Computer Science',
+        studyTimeMinutes: 60,
+        skills: [
+          { name: 'JavaScript', level: 'intermediate' },
+          { name: 'React', level: 'intermediate' },
+          { name: 'Node.js', level: 'beginner' },
+        ],
+        interests: ['Web Development', 'Frontend Engineering'],
+        profileVector: generateDummyEmbedding(),
+        disengagementRiskScore: 0.1,
+      },
+      {
+        _id: DEMO_USER_IDS['Peyton Lewis'],
+        name: 'Peyton Lewis',
+        email: 'peyton.lewis@demo.com',
+        passwordHash: PASSWORD_HASH,
+        role: 'learner' as const,
+        onboardingCompleted: true,
+        academicBackground: 'Biology',
+        studyTimeMinutes: 30,
+        skills: [],
+        interests: ['Data Science'],
+        profileVector: generateDummyEmbedding(),
+        disengagementRiskScore: 0.8, // Cold start - high disengagement risk
+      },
+      {
+        _id: DEMO_USER_IDS['Alex Chen'],
+        name: 'Alex Chen',
+        email: 'alex.chen@demo.com',
+        passwordHash: PASSWORD_HASH,
+        role: 'learner' as const,
+        onboardingCompleted: true,
+        academicBackground: 'Self-taught',
+        studyTimeMinutes: 45,
+        skills: [
+          { name: 'Python', level: 'beginner' },
+        ],
+        interests: ['Machine Learning', 'Data Science'],
+        profileVector: generateDummyEmbedding(),
+        disengagementRiskScore: 0.2,
+      },
+      {
+        _id: DEMO_USER_IDS['Jordan Kim'],
+        name: 'Jordan Kim',
+        email: 'jordan.kim@demo.com',
+        passwordHash: PASSWORD_HASH,
+        role: 'learner' as const,
+        onboardingCompleted: true,
+        academicBackground: 'Software Engineering',
+        studyTimeMinutes: 90,
+        skills: [
+          { name: 'TypeScript', level: 'advanced' },
+          { name: 'React', level: 'advanced' },
+          { name: 'Node.js', level: 'intermediate' },
+          { name: 'AWS', level: 'intermediate' },
+        ],
+        interests: ['Backend Engineering', 'DevOps & Cloud', 'Software Architecture'],
+        profileVector: generateDummyEmbedding(),
+        disengagementRiskScore: 0.05,
+      },
+    ];
+
+    for (const demoUserData of demoUsersData) {
+      const user = new UserModel(demoUserData);
+      await user.save();
+      users.push(user);
+    }
+    console.log(`  Created 4 demo users with fixed IDs`);
+
+    // Create remaining random users
+    const remainingUsers = NUM_USERS - 4;
+    for (let i = 0; i < remainingUsers; i++) {
       const userData = generateUser(i);
       const user = new UserModel(userData);
       await user.save();
       users.push(user);
       if ((i + 1) % 10 === 0) {
-        console.log(`  Created ${i + 1}/${NUM_USERS} users...`);
+        console.log(`  Created ${i + 1}/${remainingUsers} random users...`);
       }
     }
-    console.log(`✅ Created ${users.length} users`);
+    console.log(`✅ Created ${users.length} users total (4 demo + ${remainingUsers} random)`);
 
     // Create some interactions (prior completions) for testing recommendations
     console.log('🔗 Creating sample interactions...');
@@ -450,8 +539,52 @@ async function seed() {
     await InteractionModel.deleteMany({});
 
     const interactions = [];
-    // Give each user 0-8 completed courses
-    for (const user of users) {
+
+    // Create specific interactions for demo users based on their profiles
+    const demoUserInteractions = [
+      {
+        userId: DEMO_USER_IDS['Peyton Garcia'],
+        numCompletions: randomInt(5, 8), // Intermediate - has interaction history
+      },
+      {
+        userId: DEMO_USER_IDS['Peyton Lewis'],
+        numCompletions: 0, // Cold-start - no interactions yet
+      },
+      {
+        userId: DEMO_USER_IDS['Alex Chen'],
+        numCompletions: randomInt(1, 3), // Beginner - minimal interactions
+      },
+      {
+        userId: DEMO_USER_IDS['Jordan Kim'],
+        numCompletions: randomInt(7, 10), // Advanced - many interactions
+      },
+    ];
+
+    for (const demoInteraction of demoUserInteractions) {
+      const numCompletions = demoInteraction.numCompletions;
+      if (numCompletions > 0) {
+        const completedCourses = randomElements(courses, numCompletions);
+        for (const course of completedCourses) {
+          interactions.push({
+            userId: demoInteraction.userId,
+            courseId: course._id,
+            interactionType: 'complete' as const,
+            status: 'completed' as const,
+            assessmentScores: Array.from({ length: randomInt(1, 3) }, () => randomInt(60, 100)),
+            timeSpentMinutes: randomInt(
+              course.modules.reduce((sum, m) => sum + m.durationMinutes, 0) * 0.5,
+              course.modules.reduce((sum, m) => sum + m.durationMinutes, 0) * 1.5
+            ),
+            rating: randomInt(3, 5),
+            updatedAt: new Date(Date.now() - randomInt(0, 30) * 24 * 60 * 60 * 1000),
+          });
+        }
+      }
+    }
+
+    // Give remaining random users 0-8 completed courses
+    const randomUsers = users.slice(4); // Skip the 4 demo users
+    for (const user of randomUsers) {
       const numCompletions = randomInt(0, 8);
       const completedCourses = randomElements(courses, numCompletions);
 
