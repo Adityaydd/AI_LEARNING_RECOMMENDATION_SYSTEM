@@ -14,17 +14,28 @@ export const DailyTaskWidget: React.FC<DailyTaskWidgetProps> = ({ userId, onTask
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [completingTask, setCompletingTask] = useState<string | null>(null);
 
+  // Guard: don't fetch if userId is empty or invalid
+  const isValidUserId = userId && /^[0-9a-fA-F]{24}$/.test(userId);
+
   useEffect(() => {
-    fetchTasks();
-  }, [userId]);
+    if (isValidUserId) {
+      fetchTasks();
+    } else {
+      setTasks([]);
+      setIsLoading(false);
+    }
+  }, [userId, isValidUserId]);
 
   const fetchTasks = async () => {
+    if (!isValidUserId) return;
+
     setIsLoading(true);
     try {
       const response = await api.getTodaysTasks(userId);
       setTasks(response.data.tasks || []);
     } catch (err) {
       console.error('Failed to fetch tasks:', err);
+      setTasks([]);
     } finally {
       setIsLoading(false);
     }

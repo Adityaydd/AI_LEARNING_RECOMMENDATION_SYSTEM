@@ -36,7 +36,7 @@ export class GeminiProvider implements AIProvider {
       try {
         this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
         this.model = this.genAI.getGenerativeModel({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           safetySettings: [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
             { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },

@@ -18,7 +18,7 @@ const DEMO_USER_IDS = {
 // ============================================
 const NUM_USERS = 30;
 const NUM_COURSES = 50;
-const PASSWORD_HASH = '$2a$10$XOPbrlUPQdwdJUpSrIF6X.LbE14qsMmKGhM1A8W9iqaG3vv1BD7WC'; // "password123"
+const PASSWORD_HASH = '$2a$10$yI5ZeRnXgvEbUCucunJTt.KFJ9pJXhdkvcZj3plXp76Gf2BOl6H3y'; // "password123"
 
 // ============================================
 // DOMAINS & SKILLS DATA

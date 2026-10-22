@@ -83,6 +83,27 @@ class ApiClient {
     return this.client.post('/onboarding/answer', data);
   }
 
+  // New 2-step onboarding endpoints
+  async getOnboardingDomains() {
+    return this.client.get('/onboarding/domains');
+  }
+
+  async getOnboardingSkills(domain: string) {
+    return this.client.get(`/onboarding/skills/${encodeURIComponent(domain)}`);
+  }
+
+  async submitOnboardingStep1(data: { targetDomain: string }) {
+    return this.client.post('/onboarding/step1', data);
+  }
+
+  async submitOnboardingStep2(data: { skills: string[] }) {
+    return this.client.post('/onboarding/step2', data);
+  }
+
+  async getOnboardingStatus() {
+    return this.client.get('/onboarding/status');
+  }
+
   async completeOnboarding() {
     return this.client.post('/onboarding/complete');
   }
@@ -93,16 +114,16 @@ class ApiClient {
   }
 
   // Task endpoints
-  async generateTasks(data: { courseId?: string; date?: string }) {
-    return this.client.post(`/tasks/generate`, data);
+  async generateTasks(data: { userId: string; courseId?: string; date?: string }) {
+    return this.client.post(`/daily-tasks/generate`, data);
   }
 
   async getTodaysTasks(userId: string) {
-    return this.client.get(`/tasks/today/${userId}`);
+    return this.client.get(`/daily-tasks/today/${userId}`);
   }
 
   async completeTaskUnit(taskId: string, unitIndex: number) {
-    return this.client.patch(`/tasks/${taskId}/complete`, { unitIndex });
+    return this.client.patch(`/daily-tasks/${taskId}/complete`, { unitIndex });
   }
 
   // Analytics endpoints
@@ -127,6 +148,15 @@ class ApiClient {
   // Interaction endpoints
   async getUserInteractions(userId: string) {
     return this.client.get(`/interactions/user/${userId}`);
+  }
+
+  async createInteraction(data: { userId: string; courseId: string; interactionType: string; timeSpentMinutes?: number; completionStatus?: string }) {
+    return this.client.post('/interactions', data);
+  }
+
+  // Course endpoints
+  async getCourse(courseId: string) {
+    return this.client.get(`/courses/${courseId}`);
   }
 }
 
@@ -165,6 +195,24 @@ export interface Recommendation {
   difficulty: string;
   matchScore: number;
   reason: string;
+}
+
+export interface CourseDetail {
+  id: string;
+  title: string;
+  description: string;
+  domain: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  prerequisites: string[];
+  modules: Array<{ title: string; content: string; durationMinutes: number }>;
+  skillsTaught: string[];
+  tfidfTerms: Record<string, number>;
+  embedding?: number[];
+  eligibilityRules: Record<string, unknown>;
+  totalDurationMinutes: number;
+  moduleCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DailyTask {

@@ -3,20 +3,16 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Loader2, BookOpen, Target } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { OnboardingView } from './views/OnboardingView';
+import { LoginView } from './views/LoginView';
+import { RegisterView } from './views/RegisterView';
 import { RecommendationFeed } from './views/RecommendationFeed';
 import { DailyTaskWidget } from './views/DailyTaskWidget';
 import { ProgressSummary } from './views/ProgressSummary';
+import { CourseDetailModal } from './components/CourseDetailModal';
 import { useAuthStore } from './hooks/useAuthStore';
+import { useDemoUser, DEMO_USERS, DemoUserProvider } from './hooks/useDemoUser';
 import { api } from './services/api';
 import { clsx } from 'clsx';
-
-// Demo user IDs from Navbar
-const DEMO_USERS = [
-  { id: '6ad99527d2621ee6c604e74e', name: 'Peyton Garcia', tier: 'Intermediate' },
-  { id: '6ad99527d2621ee6c604e750', name: 'Peyton Lewis', tier: 'Cold-Start' },
-  { id: '6ad99527d2621ee6c604e74f', name: 'Alex Chen', tier: 'Beginner' },
-  { id: '6ad99527d2621ee6c604e751', name: 'Jordan Kim', tier: 'Advanced' },
-];
 
 // Protected route wrapper
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -33,22 +29,21 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 // Main Dashboard view
 const DashboardView: React.FC = () => {
   const { user, userId } = useAuthStore();
-  const [activeUserId, setActiveUserId] = useState<string>('');
+  const { activeUserId, setActiveUserId, effectiveUserId, getActiveUser } = useDemoUser();
   const [streak, setStreak] = useState(0);
   const [totalHours, setTotalHours] = useState(0);
   const [tier, setTier] = useState('Novice');
   const [skills, setSkills] = useState<Array<{ skill: string; level: number; trend: 'up' | 'down' | 'stable' }>>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Use selected demo user or current user
-  const effectiveUserId = activeUserId || userId || '';
+  const effectiveUserIdValue = effectiveUserId(userId || '');
 
   const fetchProgress = useCallback(async () => {
-    if (!effectiveUserId) return;
+    if (!effectiveUserIdValue) return;
     setIsLoading(true);
     try {
       // Fetch interactions to calculate streak and hours
-      const interactionsRes = await api.getUserInteractions(effectiveUserId);
+      const interactionsRes = await api.getUserInteractions(effectiveUserIdValue);
       const interactions = interactionsRes.data.interactions || [];
 
       // Calculate streak (consecutive days with activity)
@@ -81,7 +76,7 @@ const DashboardView: React.FC = () => {
       else if (completedCount >= 1) currentTier = 'Beginner';
 
       // Mock skills data based on user's interests
-      const demoUser = DEMO_USERS.find(u => u.id === effectiveUserId);
+      const demoUser = getActiveUser();
       const userSkills = demoUser
         ? [
             { skill: 'Web Development', level: 65, trend: 'up' as const },
@@ -104,7 +99,7 @@ const DashboardView: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [effectiveUserId]);
+  }, [effectiveUserIdValue, getActiveUser]);
 
   useEffect(() => {
     fetchProgress();
@@ -112,7 +107,7 @@ const DashboardView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar onUserSelect={setActiveUserId} />
+      <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Header */}
@@ -124,7 +119,7 @@ const DashboardView: React.FC = () => {
               </h1>
               <p className="text-gray-500 mt-1">
                 {activeUserId
-                  ? `Viewing as ${DEMO_USERS.find(u => u.id === activeUserId)?.name}`
+                  ? `Viewing as ${getActiveUser()?.name}`
                   : 'Your personalized learning dashboard'}
               </p>
             </div>
@@ -206,12 +201,12 @@ const DashboardView: React.FC = () => {
 // Tasks view
 const TasksView: React.FC = () => {
   const { userId } = useAuthStore();
-  const [activeUserId, setActiveUserId] = useState<string>('');
-  const effectiveUserId = activeUserId || userId || '';
+  const { activeUserId, effectiveUserId } = useDemoUser();
+  const effectiveUserIdValue = effectiveUserId(userId || '');
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar onUserSelect={setActiveUserId} />
+      <Navbar />
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Today's Tasks</h1>
@@ -221,7 +216,7 @@ const TasksView: React.FC = () => {
               : 'Your personalized micro-learning units'}
           </p>
         </div>
-        <DailyTaskWidget userId={effectiveUserId} />
+        <DailyTaskWidget userId={effectiveUserIdValue} />
       </main>
     </div>
   );
@@ -229,23 +224,55 @@ const TasksView: React.FC = () => {
 
 // Recommendations view
 const RecommendationsView: React.FC = () => {
-  const { userId } = useAuthStore();
-  const [activeUserId, setActiveUserId] = useState<string>('');
-  const effectiveUserId = activeUserId || userId || '';
+  const { userId, user } = useAuthStore();
+  const { activeUserId, effectiveUserId, getActiveUser } = useDemoUser();
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const effectiveUserIdValue = effectiveUserId(userId || '');
+
+  // Get user profile for "Why Recommended" - use demo profile if viewing demo user, else actual user
+  const demoUser = getActiveUser();
+  const modalUser = demoUser
+    ? { skills: demoUser.skills || [], interests: demoUser.interests || [] }
+    : user
+      ? { skills: user.skills || [], interests: user.interests || [] }
+      : { skills: [], interests: [] };
+
+  const handleCourseSelect = (courseId: string) => {
+    setSelectedCourseId(courseId);
+  };
+
+  const handleModalClose = () => {
+    setSelectedCourseId(null);
+  };
+
+  const handleEnrollSuccess = () => {
+    // Could refresh recommendations or show a toast
+    console.log('Enrolled successfully!');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar onUserSelect={setActiveUserId} />
+      <Navbar />
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Recommendations</h1>
           <p className="text-gray-500 mt-1">
             {activeUserId
-              ? `Viewing recommendations for ${DEMO_USERS.find(u => u.id === activeUserId)?.name}`
+              ? `Viewing recommendations for ${demoUser?.name}`
               : 'AI-powered personalized course suggestions'}
           </p>
         </div>
-        <RecommendationFeed userId={effectiveUserId} />
+        <RecommendationFeed userId={effectiveUserIdValue} onCourseSelect={handleCourseSelect} />
+
+        {selectedCourseId && (
+          <CourseDetailModal
+            courseId={selectedCourseId}
+            userId={effectiveUserIdValue}
+            user={modalUser as any}
+            onClose={handleModalClose}
+            onEnrollSuccess={handleEnrollSuccess}
+          />
+        )}
       </main>
     </div>
   );
@@ -254,8 +281,8 @@ const RecommendationsView: React.FC = () => {
 // Progress view
 const ProgressView: React.FC = () => {
   const { userId } = useAuthStore();
-  const [activeUserId, setActiveUserId] = useState<string>('');
-  const effectiveUserId = activeUserId || userId || '';
+  const { activeUserId, effectiveUserId, getActiveUser } = useDemoUser();
+  const effectiveUserIdValue = effectiveUserId(userId || '');
   const [streak, setStreak] = useState(0);
   const [totalHours, setTotalHours] = useState(0);
   const [tier, setTier] = useState('Novice');
@@ -263,10 +290,10 @@ const ProgressView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchProgress = useCallback(async () => {
-    if (!effectiveUserId) return;
+    if (!effectiveUserIdValue) return;
     setIsLoading(true);
     try {
-      const interactionsRes = await api.getUserInteractions(effectiveUserId);
+      const interactionsRes = await api.getUserInteractions(effectiveUserIdValue);
       const interactions = interactionsRes.data.interactions || [];
 
       const dates = new Set(
@@ -294,7 +321,7 @@ const ProgressView: React.FC = () => {
       else if (completedCount >= 5) currentTier = 'Intermediate';
       else if (completedCount >= 1) currentTier = 'Beginner';
 
-      const demoUser = DEMO_USERS.find(u => u.id === effectiveUserId);
+      const demoUser = getActiveUser();
       const userSkills = demoUser
         ? [
             { skill: 'Web Development', level: 65, trend: 'up' as const },
@@ -317,7 +344,7 @@ const ProgressView: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [effectiveUserId]);
+  }, [effectiveUserIdValue, getActiveUser]);
 
   useEffect(() => {
     fetchProgress();
@@ -325,13 +352,13 @@ const ProgressView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar onUserSelect={setActiveUserId} />
+      <Navbar />
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Progress Analytics</h1>
           <p className="text-gray-500 mt-1">
             {activeUserId
-              ? `Viewing progress for ${DEMO_USERS.find(u => u.id === activeUserId)?.name}`
+              ? `Viewing progress for ${getActiveUser()?.name}`
               : 'Your learning journey insights'}
           </p>
         </div>
@@ -389,7 +416,7 @@ const SettingsView: React.FC = () => {
 
 // App wrapper with auth initialization
 const AppContent: React.FC = () => {
-  const { initializeAuth, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { initializeAuth, isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const location = useLocation();
 
   useEffect(() => {
@@ -407,19 +434,45 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // If not authenticated and not on onboarding, redirect to onboarding
-  if (!isAuthenticated && location.pathname !== '/onboarding') {
+  // Public routes that don't require auth
+  const publicPaths = ['/login', '/register'];
+  const isPublicPath = publicPaths.includes(location.pathname);
+
+  // If not authenticated and not on public path, redirect to login
+  if (!isAuthenticated && !isPublicPath) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  // If authenticated and on public path (login/register), redirect based on onboarding
+  if (isAuthenticated && isPublicPath) {
+    const from = location.state?.from as string || '/dashboard';
+    if (user?.onboardingCompleted) {
+      return <Navigate to={from} replace />;
+    }
     return <Navigate to="/onboarding" replace />;
   }
 
-  // If authenticated and on onboarding, redirect to dashboard
-  if (isAuthenticated && location.pathname === '/onboarding') {
+  // If authenticated and on onboarding but already completed, redirect to dashboard
+  if (isAuthenticated && location.pathname === '/onboarding' && user?.onboardingCompleted) {
     return <Navigate to="/dashboard" replace />;
   }
 
   return (
-      <Routes>
-        <Route path="/onboarding" element={<OnboardingView />} />
+      <DemoUserProvider>
+        <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={<LoginView />} />
+        <Route path="/register" element={<RegisterView />} />
+
+        {/* Protected routes */}
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <OnboardingView />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/dashboard"
           element={
@@ -463,6 +516,7 @@ const AppContent: React.FC = () => {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+    </DemoUserProvider>
   );
 };
 

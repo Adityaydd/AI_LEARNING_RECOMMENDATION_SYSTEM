@@ -17,6 +17,11 @@ export const userZodSchema = z.object({
   interests: z.array(z.string().max(50)).default([]),
   profileVector: z.array(z.number()).length(384).optional(),
   disengagementRiskScore: z.number().min(0).max(1).default(0),
+  onboardingAnswers: z.object({
+    targetDomain: z.string().optional(),
+    skills: z.array(z.string()).optional(),
+    studyTimeMinutes: z.number().int().min(5).max(480).optional(),
+  }).optional(),
 });
 
 export const registerZodSchema = z.object({
@@ -53,6 +58,11 @@ export interface IUser extends Document {
   interests: string[];
   profileVector?: number[];
   disengagementRiskScore: number;
+  onboardingAnswers?: {
+    targetDomain?: string;
+    skills?: string[];
+    studyTimeMinutes?: number;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -69,6 +79,11 @@ const userSchema = new Schema<IUser>({
   interests: { type: [String], default: [] },
   profileVector: { type: [Number], validate: { validator: (v: number[]) => v == null || (Array.isArray(v) && v.length === 0) || (v.length === 384), message: 'profileVector must be 384 dimensions' } },
   disengagementRiskScore: { type: Number, default: 0, min: 0, max: 1 },
+  onboardingAnswers: {
+    targetDomain: { type: String },
+    skills: { type: [String] },
+    studyTimeMinutes: { type: Number, min: 5, max: 480 },
+  },
 }, {
   timestamps: true,
 });

@@ -15,6 +15,8 @@ import analyticsRoutes from './routes/analytics.js';
 import dailyTaskRoutes from './routes/dailyTasks.js';
 import resumeRoutes from './routes/resume.js';
 import jobRoutes from './routes/jobs.js';
+import interactionRoutes from './routes/interactions.js';
+import courseRoutes from './routes/courses.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -58,6 +60,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/daily-tasks', dailyTaskRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/interactions', interactionRoutes);
+app.use('/api/courses', courseRoutes);
 
 // 404 handler
 app.use((_req, res) => {
