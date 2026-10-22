@@ -2,6 +2,7 @@ import { UserModel } from '../models/User.js';
 import { CourseModel } from '../models/Course.js';
 import { InteractionModel } from '../models/Interaction.js';
 import TfIdf from 'natural/lib/natural/tfidf/tfidf.js';
+import { getAIProvider } from './ai/geminiProvider.js';
 import type { Types } from 'mongoose';
 
 // ============================================
@@ -55,6 +56,33 @@ function buildTfIdfVector(documents: string[], queryTerms: string[]): number[] {
     }
   });
   return vector;
+}
+
+// ============================================
+// EMBEDDING GENERATION (with AI Provider)
+// ============================================
+const embeddingCache = new Map<string, number[]>();
+
+async function generateEmbedding(text: string): Promise<number[]> {
+  const cacheKey = text.substring(0, 100);
+  if (embeddingCache.has(cacheKey)) {
+    return embeddingCache.get(cacheKey)!;
+  }
+
+  const aiProvider = getAIProvider();
+  const embedding = await aiProvider.generateTextEmbeddings(text);
+
+  embeddingCache.set(cacheKey, embedding);
+  return embedding;
+}
+
+async function computeSemanticSimilarity(textA: string, textB: string): Promise<number> {
+  const [embeddingA, embeddingB] = await Promise.all([
+    generateEmbedding(textA),
+    generateEmbedding(textB),
+  ]);
+
+  return cosineSimilarity(embeddingA, embeddingB);
 }
 
 async function getUserProfile(userId: string): Promise<UserProfile | null> {
@@ -114,6 +142,12 @@ export async function getContentBasedRecommendations(
       }));
   }
 
+  // Build user profile text for semantic comparison
+  const userProfileText = [
+    ...userProfile.interests,
+    ...userProfile.skills.map(s => s.name),
+  ].join(' ');
+
   // Build course documents for TF-IDF
   const courseDocs = courses.map(c =>
     `${c.title} ${c.description} ${c.skillsTaught.join(' ')} ${c.domain}`.toLowerCase()
@@ -125,7 +159,8 @@ export async function getContentBasedRecommendations(
 
   const scoredCourses: CourseScore[] = [];
 
-  courses.forEach((course, idx) => {
+  for (let idx = 0; idx < courses.length; idx++) {
+    const course = courses[idx];
     let totalScore = 0;
     let matchCount = 0;
 
@@ -139,6 +174,16 @@ export async function getContentBasedRecommendations(
 
     // Normalize by number of matching terms
     const normalizedScore = matchCount > 0 ? totalScore / queryTerms.length : 0;
+
+    // Semantic similarity using AI provider embeddings (with fallback)
+    let semanticScore = 0;
+    try {
+      const courseText = `${course.title} ${course.description} ${course.skillsTaught.join(' ')} ${course.domain}`;
+      semanticScore = await computeSemanticSimilarity(userProfileText, courseText);
+    } catch (error) {
+      // Fallback to TF-IDF only if semantic similarity fails
+      semanticScore = 0;
+    }
 
     // Boost score for matching user's skill levels
     let skillBoost = 0;
@@ -162,7 +207,15 @@ export async function getContentBasedRecommendations(
       difficultyBonus = Math.max(0, 0.2 - levelDiff * 0.1);
     }
 
-    const finalScore = Math.min(1, normalizedScore + skillBoost + difficultyBonus);
+    // Combine TF-IDF (40%) + Semantic (40%) + Skill/Difficulty (20%)
+    const tfidfWeight = 0.4;
+    const semanticWeight = 0.4;
+    const finalScore = Math.min(1,
+      normalizedScore * tfidfWeight +
+      semanticScore * semanticWeight +
+      skillBoost +
+      difficultyBonus
+    );
 
     scoredCourses.push({
       courseId: course._id,
@@ -170,9 +223,9 @@ export async function getContentBasedRecommendations(
       domain: course.domain,
       difficulty: course.difficulty,
       score: finalScore,
-      reason: `Matches ${matchCount}/${queryTerms.length} interest areas`,
+      reason: `Matches ${matchCount}/${queryTerms.length} interests (TF-IDF: ${(normalizedScore * 100).toFixed(0)}%, Semantic: ${(semanticScore * 100).toFixed(0)}%)`,
     });
-  });
+  }
 
   // Sort by score descending and return top N
   return scoredCourses
@@ -227,9 +280,9 @@ function computeUserSimilarity(
 ): number {
   const coursesA = new Set(userA.keys());
   const coursesB = new Set(userB.keys());
-  const allCourses = new Set([...coursesA, ...coursesB]);
+  const allCourses = Array.from(new Set([...coursesA, ...coursesB]));
 
-  if (allCourses.size === 0) return 0;
+  if (allCourses.length === 0) return 0;
 
   let dotProduct = 0;
   let normA = 0;

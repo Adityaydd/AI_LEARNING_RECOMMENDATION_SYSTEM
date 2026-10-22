@@ -19,12 +19,12 @@ export const userZodSchema = z.object({
   disengagementRiskScore: z.number().min(0).max(1).default(0),
 });
 
-export const registerZodSchema = userZodSchema.pick({
-  name: true,
-  email: true,
+export const registerZodSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: z.string().email(),
   password: z.string().min(8).max(128),
-  studyTimeMinutes: true,
-}).required();
+  studyTimeMinutes: z.number().int().min(5).max(480).default(30),
+});
 
 export const loginZodSchema = z.object({
   email: z.string().email(),

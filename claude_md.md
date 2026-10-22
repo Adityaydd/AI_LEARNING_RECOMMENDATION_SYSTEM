@@ -98,7 +98,115 @@ cd client && npm run dev
 cd client && npm run build      # TypeScript check + Vite bundle
 ```
 
-## 7. Vibe Coding Rules & Guardrails for Claude
+## 7. AI Provider Pattern — Pluggable Architecture
+
+The AI layer uses an **External API Provider Pattern** to enable zero-downtime provider switching and graceful degradation.
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    AIProvider Interface                      │
+│  (server/src/services/ai/aiProvider.ts)                     │
+├─────────────────────────────────────────────────────────────┤
+│  • generateDailyTasks(userProfile, course)                  │
+│  • generateTextEmbeddings(text)                             │
+│  • tailorResumeBullet(courseTitle, skills)                  │
+└─────────────────────────────────────────────────────────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              ▼             ▼             ▼
+       ┌────────────┐ ┌──────────┐ ┌──────────┐
+       │ Gemini     │ │ Local    │ │ Mock     │
+       │ Provider   │ │ TF-IDF   │ │ Provider │
+       │ (Primary)  │ │ Fallback │ │ (Tests)  │
+       └────────────┘ └──────────┘ └──────────┘
+```
+
+### Current Providers
+
+| Provider | File | Use Case | Cost |
+|----------|------|----------|------|
+| **Gemini** | `server/src/services/ai/geminiProvider.ts` | Primary cloud free tier | Free tier |
+| **Local TF-IDF** | Built into `geminiProvider.ts` | Fallback when API unavailable | $0 |
+| **Mock** | (future) `mockProvider.ts` | CI/CD, offline dev | $0 |
+
+### Configuration
+
+Set the active provider via environment variable:
+
+```env
+# server/.env or root .env.example
+AI_PROVIDER=gemini          # gemini | local | mock
+GEMINI_API_KEY=your_key     # Get from https://aistudio.google.com/
+```
+
+### Switching Providers
+
+1. **Add a new provider**: Create `server/src/services/ai/<name>Provider.ts` implementing `AIProvider` interface
+2. **Register in factory**: Update `getAIProvider()` in `geminiProvider.ts` (or create a dedicated factory)
+3. **Set env var**: Change `AI_PROVIDER=<name>` and add required API keys
+4. **No code changes needed** in controllers/services — they depend on the interface only
+
+### Graceful Fallback Behavior
+
+The `GeminiProvider` automatically falls back to local TF-IDF when:
+- `GEMINI_API_KEY` is not set
+- API returns 429 (rate limit) or quota exceeded
+- Network errors occur
+- JSON parsing fails
+
+This ensures **tests and builds never fail** due to external API issues.
+
+### Usage in Services
+
+```typescript
+// In any service/controller:
+import { getAIProvider } from '../services/ai/geminiProvider.js';
+
+const aiProvider = getAIProvider();
+
+// Generate daily tasks
+const tasks = await aiProvider.generateDailyTasks(userProfile, course);
+
+// Generate embeddings for recommendations
+const embedding = await aiProvider.generateTextEmbeddings(text);
+
+// Tailor resume bullets
+const bullet = await aiProvider.tailorResumeBullet(courseTitle, skills);
+```
+
+### Adding a New Provider (e.g., Groq, Ollama)
+
+1. Create `server/src/services/ai/groqProvider.ts`:
+```typescript
+import { AIProvider } from './aiProvider.js';
+
+export class GroqProvider implements AIProvider {
+  async generateDailyTasks(...) { /* ... */ }
+  async generateTextEmbeddings(...) { /* ... */ }
+  async tailorResumeBullet(...) { /* ... */ }
+}
+```
+
+2. Update factory in `geminiProvider.ts` (or create `providerFactory.ts`):
+```typescript
+export function getAIProvider(): AIProvider {
+  switch (process.env.AI_PROVIDER) {
+    case 'groq': return new GroqProvider();
+    case 'ollama': return new OllamaProvider();
+    case 'local': return new LocalProvider();
+    case 'gemini':
+    default: return new GeminiProvider();
+  }
+}
+```
+
+3. Add env vars to `.env.example`
+
+---
+
+## 8. Vibe Coding Rules & Guardrails for Claude
 
 1. **Zero Paid APIs Rule:** Never import or require paid-only SDKs (no paid OpenAI or Anthropic API dependencies). Always use `@huggingface/transformers` + `natural` for local embeddings/NLP, and route generative prompts through the unified free `aiProvider.js` service (supporting Gemini Free Tier, Groq Free Tier, Ollama, and an automatic zero-key deterministic fallback).
 2. **Plan First, Code Second:** Never generate multi-file features without updating `plan.md` first. Ask clarifying questions if requirements are ambiguous.
