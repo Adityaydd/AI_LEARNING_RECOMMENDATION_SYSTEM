@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, CheckCircle, Target, Brain, Loader2, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../hooks/useAuthStore';
+import { useDemoUser } from '../hooks/useDemoUser';
 import { api } from '../services/api';
 import { clsx } from 'clsx';
 
@@ -41,6 +42,7 @@ const SKILLS_BY_DOMAIN: Record<string, string[]> = {
 export const OnboardingView: React.FC = () => {
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
+  const { clearActiveUser } = useDemoUser();
   const [currentStep, setCurrentStep] = useState<'domain' | 'skills'>('domain');
   const [selectedDomain, setSelectedDomain] = useState<string>('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
@@ -139,6 +141,7 @@ export const OnboardingView: React.FC = () => {
           accessToken: state.accessToken || '',
           refreshToken: state.refreshToken || '',
         });
+        clearActiveUser();
         navigate('/recommendations', { replace: true });
       } else {
         setError('Onboarding completed but failed to get user data');

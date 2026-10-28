@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../hooks/useAuthStore';
+import { useDemoUser } from '../hooks/useDemoUser';
 import { api } from '../services/api';
 import { clsx } from 'clsx';
 
 export const LoginView: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, setAuth } = useAuthStore();
+  const { clearActiveUser } = useDemoUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +33,7 @@ export const LoginView: React.FC = () => {
         accessToken: res.data.accessToken,
         refreshToken: res.data.refreshToken,
       });
+      clearActiveUser();
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed. Please check your credentials.');

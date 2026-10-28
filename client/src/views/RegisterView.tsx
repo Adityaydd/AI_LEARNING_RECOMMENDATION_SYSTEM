@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle, Clock } from 'lucide-react';
 import { useAuthStore } from '../hooks/useAuthStore';
+import { useDemoUser } from '../hooks/useDemoUser';
 import { api } from '../services/api';
 import { clsx } from 'clsx';
 
 export const RegisterView: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, setAuth } = useAuthStore();
+  const { clearActiveUser } = useDemoUser();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,6 +51,7 @@ export const RegisterView: React.FC = () => {
         accessToken: res.data.accessToken,
         refreshToken: res.data.refreshToken,
       });
+      clearActiveUser();
       // Registration successful - redirect to onboarding
       navigate('/onboarding', { replace: true });
     } catch (err: any) {

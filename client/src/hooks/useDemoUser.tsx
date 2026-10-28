@@ -94,6 +94,10 @@ export const DemoUserProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const clearActiveUser = () => {
     setActiveUserIdState('');
+    // Clear localStorage immediately to avoid timing issues
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   };
 
   const effectiveUserId = (userId: string) => {
